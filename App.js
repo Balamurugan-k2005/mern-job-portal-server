@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(
     cors({
         origin: ["http://localhost:5173","https://mern-job-portal-client-two.vercel.app"],
-        methods: ["GET,POST,DELETE,PUT,PATCH"],
+        methods: ["GET", "POST", "DELETE", "PUT", "PATCH"],
         credentials: true,
     })
 );
