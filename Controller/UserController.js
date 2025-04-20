@@ -24,14 +24,20 @@ exports.getMe = async (req, res, next) => {
     try {
         const me = req.user;
         if (!me) {
-            next(createError(500, "Please login first"));
-        } else {
-            res.status(200).json({
-                status: true,
-                result: me,
+            // Return a 401 Unauthorized response with a clear message
+            return res.status(401).json({
+                status: false,
+                message: "User is not authenticated",
             });
         }
+
+        // Return user details without sensitive fields like password
+        res.status(200).json({
+            status: true,
+            result: me,
+        });
     } catch (error) {
+        // Handle unexpected errors
         next(createError(500, error.message));
     }
 };
@@ -90,34 +96,39 @@ exports.addUser = async (req, res, next) => {
 
 exports.loginUser = async (req, res, next) => {
     try {
+        console.time("Total Login Time");
+
         const { email, password } = req.body;
 
+        // Step 1: Find the user by email
+        console.time("Find User");
         const isUserExists = await UserModel.findOne({ email });
+        console.timeEnd("Find User");
+
         if (isUserExists) {
-            const isPasswordMatched = await bcrypt.compare(
-                password,
-                isUserExists.password
-            );
+            // Step 2: Compare the password
+            console.time("Password Comparison");
+            const isPasswordMatched = await bcrypt.compare(password, isUserExists.password);
+            console.timeEnd("Password Comparison");
+
             if (isPasswordMatched) {
-                const tokenObj = {
-                    ID: isUserExists._id,
-                    role: isUserExists.role,
-                };
+                // Step 3: Generate a JWT token
+                console.time("Token Generation");
+                const tokenObj = { ID: isUserExists._id, role: isUserExists.role };
                 const TOKEN = JWTGenerator(tokenObj);
+                console.timeEnd("Token Generation");
 
-                const one_day = 1000 * 60 * 60 * 24; //since token expire in 1day
-
+                // Step 4: Set the cookie
                 res.cookie(process.env.COOKIE_NAME, TOKEN, {
-                    expires: new Date(Date.now() + one_day),
-                    secure: true, // Sent only over HTTPS
-                    httpOnly: true, // Restricts access from client-side scripts
-                    signed: true, // Helps keep the cookie secure
+                    expires: new Date(Date.now() + 1000 * 60 * 60 * 24),
+                    secure: true,
+                    httpOnly: true,
+                    signed: true,
                     sameSite: "None",
                 });
-                res.status(200).json({
-                    status: true,
-                    message: "Login Successfully",
-                });
+
+                console.timeEnd("Total Login Time");
+                return res.status(200).json({ status: true, message: "Login Successfully" });
             } else {
                 next(createError(500, "Email or Password not matched"));
             }
@@ -125,10 +136,10 @@ exports.loginUser = async (req, res, next) => {
             next(createError(500, "User not found!!!"));
         }
     } catch (error) {
+        console.timeEnd("Total Login Time");
         next(createError(500, `something wrong: ${error.message}`));
     }
 };
-
 exports.updateUser = async (req, res, next) => {
     const data = req.body;
     try {
